@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/signature', () => ({ verifySignature: vi.fn() }));
-vi.mock('@/lib/kv', () => ({ storeEvent: vi.fn() }));
+vi.mock('@/lib/kv', () => ({ storeEvent: vi.fn(), recordHit: vi.fn() }));
 
 import { POST } from '@/app/api/webhook/route';
 import { verifySignature } from '@/lib/signature';
