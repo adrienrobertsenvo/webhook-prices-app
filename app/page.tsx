@@ -14,11 +14,19 @@ export default async function DashboardPage() {
 
   return (
     <main className="max-w-screen-xl mx-auto px-6 py-10">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Selling Prices</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {events.length} event{events.length !== 1 ? 's' : ''} received · newest first
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Selling Prices</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {events.length} event{events.length !== 1 ? 's' : ''} received · newest first
+          </p>
+        </div>
+        <a
+          href="/setup"
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 whitespace-nowrap"
+        >
+          + Add subscription
+        </a>
       </div>
 
       {events.length === 0 ? (
