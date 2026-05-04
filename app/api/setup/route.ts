@@ -12,7 +12,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  let res: Response;
+let res: Response;
   try {
     res = await fetch('https://app.senvo.ai/api/webhooks/webhook_subscription/', {
       method: 'POST',
