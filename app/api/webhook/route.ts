@@ -4,9 +4,13 @@ import { storeEvent } from '@/lib/kv';
 import type { StoredEvent } from '@/lib/types';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const secret = process.env.WEBHOOK_SIGNING_SECRET;
+  if (!secret) {
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
+  }
+
   const rawBody = Buffer.from(await request.arrayBuffer());
   const signature = request.headers.get('x-webhook-signature') ?? '';
-  const secret = process.env.WEBHOOK_SIGNING_SECRET ?? '';
 
   if (!verifySignature(secret, rawBody, signature)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
