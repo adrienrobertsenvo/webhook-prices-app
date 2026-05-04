@@ -14,3 +14,7 @@ export async function storeEvent(event: StoredEvent): Promise<void> {
 export async function getEvents(): Promise<StoredEvent[]> {
   return [...store];
 }
+
+export async function clearEvents(): Promise<void> {
+  store.splice(0, store.length);
+}

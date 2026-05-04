@@ -1,5 +1,6 @@
 import { getEvents } from '@/lib/kv';
 import type { StoredEvent } from '@/lib/types';
+import ResetButton from './ResetButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,12 +22,15 @@ export default async function DashboardPage() {
             {events.length} event{events.length !== 1 ? 's' : ''} received · newest first
           </p>
         </div>
-        <a
-          href="/setup"
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 whitespace-nowrap"
-        >
-          + Add subscription
-        </a>
+        <div className="flex gap-2">
+          {events.length > 0 && <ResetButton />}
+          <a
+            href="/setup"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 whitespace-nowrap"
+          >
+            + Add subscription
+          </a>
+        </div>
       </div>
 
       {events.length === 0 ? (
