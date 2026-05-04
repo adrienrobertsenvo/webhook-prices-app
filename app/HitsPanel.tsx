@@ -29,8 +29,6 @@ export default function HitsPanel() {
     return () => clearInterval(id);
   }, [refresh]);
 
-  if (hits.length === 0) return null;
-
   return (
     <div className="mt-10">
       <div className="flex items-center justify-between mb-3">
@@ -39,6 +37,12 @@ export default function HitsPanel() {
         </h2>
         <button onClick={refresh} className="text-xs text-gray-500 hover:text-gray-700">Refresh</button>
       </div>
+      {hits.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">
+          No hits yet — waiting for Senvo to call {' '}
+          <code className="bg-gray-100 px-1 rounded text-xs">/api/webhook</code>
+        </div>
+      ) : (
       <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500">
@@ -84,6 +88,7 @@ export default function HitsPanel() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
