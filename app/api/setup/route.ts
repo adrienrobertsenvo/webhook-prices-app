@@ -26,10 +26,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Generate a signing secret that we control (Senvo now requires it as input)
-  const signingSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const signingSecret = process.env.WEBHOOK_SIGNING_SECRET;
+  if (!signingSecret) {
+    return NextResponse.json({ error: 'WEBHOOK_SIGNING_SECRET env var is not set on this server' }, { status: 500 });
+  }
 
   const reqBody = {
     target_url: targetUrl,
