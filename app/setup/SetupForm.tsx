@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { StoredSubscription } from '@/lib/types';
 
 interface CreateResult {
@@ -13,18 +13,17 @@ interface CreateResult {
   error?: string;
 }
 
-export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: string }) {
+export default function SetupForm({
+  defaultTargetUrl,
+  initialSubscriptions,
+}: {
+  defaultTargetUrl: string;
+  initialSubscriptions: StoredSubscription[];
+}) {
   const [result, setResult] = useState<CreateResult | null>(null);
-  const [saved, setSaved] = useState<StoredSubscription[]>([]);
+  const [saved, setSaved] = useState<StoredSubscription[]>(initialSubscriptions);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/subscriptions')
-      .then((r) => r.json())
-      .then((data: StoredSubscription[]) => setSaved(data))
-      .catch(() => {});
-  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -36,11 +35,18 @@ export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: stri
       const data: CreateResult = await res.json();
       setResult(data);
       if (data.subscription_id && !data.error) {
-        // Refresh the server-side list
-        fetch('/api/subscriptions')
-          .then((r) => r.json())
-          .then((list: StoredSubscription[]) => setSaved(list))
-          .catch(() => {});
+        setSaved((prev) => [
+          {
+            subscription_id: data.subscription_id!,
+            target_url: data.target_url ?? '',
+            object_type: data.object_type ?? '',
+            event_type: data.event_type ?? '',
+            is_active: data.is_active ?? false,
+            signing_secret: data.signing_secret,
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
       }
     } catch {
       setResult({ error: 'Unexpected error — please try again.' });
@@ -68,7 +74,7 @@ export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: stri
             name="apiKeyId"
             type="text"
             required
-            placeholder="Find this in app.senvo.ai → Settings → API Keys"
+            placeholder="Find this in app.senvo.ai &rarr; Settings &rarr; API Keys"
             className="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono focus:border-gray-900 focus:outline-none"
           />
         </div>
@@ -104,7 +110,7 @@ export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: stri
           disabled={loading}
           className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {loading ? 'Creating…' : 'Create Subscription'}
+          {loading ? 'Creating...' : 'Create Subscription'}
         </button>
       </form>
 
@@ -177,9 +183,9 @@ function SubscriptionCard({
               {copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
-          <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+          <div className="mt-2 text-xs text-gray-500">
             <p className="font-medium">Next steps:</p>
-            <ol className="list-decimal ml-4 space-y-0.5">
+            <ol className="list-decimal ml-4 mt-0.5 space-y-0.5">
               <li>Vercel &rarr; Settings &rarr; Environment Variables &rarr; set <code className="bg-gray-100 px-1 rounded">WEBHOOK_SIGNING_SECRET</code></li>
               <li>Redeploy</li>
             </ol>

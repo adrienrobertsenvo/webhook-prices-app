@@ -1,11 +1,15 @@
 import { headers } from 'next/headers';
+import { getSubscriptions } from '@/lib/kv';
 import SetupForm from './SetupForm';
+
+export const dynamic = 'force-dynamic';
 
 export default async function SetupPage() {
   const headersList = await headers();
   const host = headersList.get('host') ?? 'localhost:3000';
   const proto = host.startsWith('localhost') ? 'http' : 'https';
   const defaultTargetUrl = `${proto}://${host}/api/webhook`;
+  const initialSubscriptions = await getSubscriptions();
 
   return (
     <main className="max-w-lg mx-auto px-6 py-10">
@@ -16,7 +20,7 @@ export default async function SetupPage() {
           Connect Senvo to this app to start receiving selling price events.
         </p>
       </div>
-      <SetupForm defaultTargetUrl={defaultTargetUrl} />
+      <SetupForm defaultTargetUrl={defaultTargetUrl} initialSubscriptions={initialSubscriptions} />
     </main>
   );
 }
