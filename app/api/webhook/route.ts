@@ -4,6 +4,7 @@ import { storeEvent, recordHit } from '@/lib/kv';
 import type { StoredEvent } from '@/lib/types';
 
 export async function GET(): Promise<NextResponse> {
+  recordHit({ received_at: new Date().toISOString(), method: 'GET', signature: '(none)', body: '', result: 'ignored', status: 200 });
   return NextResponse.json({ ok: true });
 }
 
