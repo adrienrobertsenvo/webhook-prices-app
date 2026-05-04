@@ -32,7 +32,17 @@ export default function SetupForm({
     const formData = new FormData(e.currentTarget);
     try {
       const res = await fetch('/api/setup', { method: 'POST', body: formData });
-      const data: CreateResult = await res.json();
+      console.log('[setup] response status:', res.status, res.statusText);
+      const text = await res.text();
+      console.log('[setup] response body:', text);
+      let data: CreateResult;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setResult({ error: `Server returned non-JSON (status ${res.status}): ${text.slice(0, 200)}` });
+        return;
+      }
+      console.log('[setup] parsed data:', JSON.stringify(data));
       setResult(data);
       if (data.subscription_id && !data.error) {
         setSaved((prev) => [
@@ -48,8 +58,9 @@ export default function SetupForm({
           ...prev,
         ]);
       }
-    } catch {
-      setResult({ error: 'Unexpected error — please try again.' });
+    } catch (err) {
+      console.error('[setup] fetch error:', err);
+      setResult({ error: `Unexpected error: ${err instanceof Error ? err.message : String(err)}` });
     } finally {
       setLoading(false);
     }
