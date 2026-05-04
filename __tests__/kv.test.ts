@@ -31,7 +31,11 @@ const sampleEvent: StoredEvent = {
 };
 
 describe('storeEvent', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.KV_REST_API_URL = 'http://localhost';
+    process.env.KV_REST_API_TOKEN = 'test-token';
+  });
 
   it('pushes serialised event to the list', async () => {
     mockLpush.mockResolvedValue(1);
@@ -52,7 +56,11 @@ describe('storeEvent', () => {
 });
 
 describe('getEvents', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.KV_REST_API_URL = 'http://localhost';
+    process.env.KV_REST_API_TOKEN = 'test-token';
+  });
 
   it('returns deserialised events', async () => {
     mockLrange.mockResolvedValue([JSON.stringify(sampleEvent)]);
