@@ -1,7 +1,4 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
-const SESSION_COOKIE = 'dash_session';
+import { NextRequest, NextResponse } from 'next/server';
 
 async function timingSafeEqual(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
@@ -29,33 +26,30 @@ async function deriveSessionToken(password: string): Promise<string> {
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function proxy(request: NextRequest): Promise<NextResponse> {
-  const { pathname } = request.nextUrl;
-
-  // These routes are always public
-  if (
-    pathname.startsWith('/api/webhook') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/login')
-  ) {
-    return NextResponse.next();
-  }
-
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const expected = process.env.DASHBOARD_PASSWORD ?? '';
-  if (!expected) return NextResponse.next(); // no password set = open access
+  if (!expected) return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
 
-  const expectedToken = await deriveSessionToken(expected);
-  const sessionCookie = request.cookies.get(SESSION_COOKIE);
-
-  if (sessionCookie?.value && (await timingSafeEqual(sessionCookie.value, expectedToken))) {
-    return NextResponse.next();
+  let password: string;
+  try {
+    const body = await request.json();
+    password = (body.password as string) ?? '';
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  // Not authenticated — redirect to login page
-  const loginUrl = new URL('/login', request.url);
-  return NextResponse.redirect(loginUrl);
-}
+  if (!(await timingSafeEqual(password, expected))) {
+    return NextResponse.json({ error: 'Wrong password' }, { status: 401 });
+  }
 
-export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-};
+  const token = await deriveSessionToken(expected);
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set('dash_session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 60 * 60 * 24,
+  });
+  return response;
+}
