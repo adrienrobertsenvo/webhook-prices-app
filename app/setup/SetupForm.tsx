@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { StoredSubscription } from '@/lib/types';
 
-interface SetupResult {
+interface CreateResult {
   signing_secret?: string;
   subscription_id?: string;
   target_url?: string;
@@ -12,45 +13,34 @@ interface SetupResult {
   error?: string;
 }
 
-const LS_KEY = 'senvo_subscriptions';
-
-function loadSaved(): SetupResult[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) ?? '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveSubscription(sub: SetupResult) {
-  if (typeof window === 'undefined') return;
-  const existing = loadSaved();
-  const updated = [sub, ...existing.filter((s) => s.subscription_id !== sub.subscription_id)];
-  localStorage.setItem(LS_KEY, JSON.stringify(updated));
-}
-
 export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: string }) {
-  const [result, setResult] = useState<SetupResult | null>(null);
-  const [saved, setSaved] = useState<SetupResult[]>([]);
+  const [result, setResult] = useState<CreateResult | null>(null);
+  const [saved, setSaved] = useState<StoredSubscription[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setSaved(loadSaved());
+    fetch('/api/subscriptions')
+      .then((r) => r.json())
+      .then((data: StoredSubscription[]) => setSaved(data))
+      .catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setResult(null);
+    const formData = new FormData(e.currentTarget);
     try {
-      const res = await fetch('/api/setup', { method: 'POST', body: new FormData(e.currentTarget) });
-      const data: SetupResult = await res.json();
+      const res = await fetch('/api/setup', { method: 'POST', body: formData });
+      const data: CreateResult = await res.json();
       setResult(data);
       if (data.subscription_id && !data.error) {
-        saveSubscription(data);
-        setSaved(loadSaved());
+        // Refresh the server-side list
+        fetch('/api/subscriptions')
+          .then((r) => r.json())
+          .then((list: StoredSubscription[]) => setSaved(list))
+          .catch(() => {});
       }
     } catch {
       setResult({ error: 'Unexpected error — please try again.' });
@@ -65,7 +55,7 @@ export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: stri
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard API not available — do nothing
+      // clipboard API not available
     }
   }
 
@@ -126,7 +116,7 @@ export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: stri
       )}
 
       {result?.subscription_id && !result.error && (
-        <SubscriptionCard sub={result} copied={copied} onCopy={copySecret} />
+        <SubscriptionCard sub={result} copied={copied} onCopy={copySecret} isNew />
       )}
 
       {saved.length > 0 && (
@@ -134,7 +124,7 @@ export default function SetupForm({ defaultTargetUrl }: { defaultTargetUrl: stri
           <h2 className="text-base font-semibold text-gray-900 mb-3">Previously created subscriptions</h2>
           <div className="space-y-3">
             {saved.map((sub) => (
-              <SubscriptionCard key={sub.subscription_id} sub={sub} copied={false} onCopy={copySecret} />
+              <SubscriptionCard key={sub.subscription_id} sub={sub} copied={false} onCopy={copySecret} isNew={false} />
             ))}
           </div>
         </div>
@@ -147,15 +137,17 @@ function SubscriptionCard({
   sub,
   copied,
   onCopy,
+  isNew,
 }: {
-  sub: SetupResult;
+  sub: CreateResult | StoredSubscription;
   copied: boolean;
   onCopy: (s: string) => void;
+  isNew: boolean;
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-900">Subscription created</p>
+        <p className="text-sm font-semibold text-gray-900">{isNew ? 'Subscription created' : 'Subscription'}</p>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sub.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
           {sub.is_active ? 'active' : 'inactive'}
         </span>
@@ -172,13 +164,14 @@ function SubscriptionCard({
       </div>
       {sub.signing_secret && (
         <div>
-          <p className="text-xs font-semibold text-amber-700 mb-1">⚠️ Signing secret — copy now, shown only once</p>
+          <p className="text-xs font-semibold text-amber-700 mb-1">Signing secret — copy now, shown only once</p>
           <div className="flex items-stretch gap-2">
             <code className="flex-1 rounded border bg-amber-50 px-3 py-2 text-xs font-mono break-all">
               {sub.signing_secret}
             </code>
             <button
-              onClick={() => onCopy(sub.signing_secret!)}
+              type="button"
+              onClick={() => onCopy(sub.signing_secret as string)}
               className="shrink-0 rounded border px-3 text-xs font-medium hover:bg-gray-50"
             >
               {copied ? 'Copied!' : 'Copy'}
@@ -187,7 +180,7 @@ function SubscriptionCard({
           <div className="mt-2 text-xs text-gray-500 space-y-0.5">
             <p className="font-medium">Next steps:</p>
             <ol className="list-decimal ml-4 space-y-0.5">
-              <li>Vercel → Settings → Environment Variables → set <code className="bg-gray-100 px-1 rounded">WEBHOOK_SIGNING_SECRET</code></li>
+              <li>Vercel &rarr; Settings &rarr; Environment Variables &rarr; set <code className="bg-gray-100 px-1 rounded">WEBHOOK_SIGNING_SECRET</code></li>
               <li>Redeploy</li>
             </ol>
           </div>

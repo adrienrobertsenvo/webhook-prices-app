@@ -1,3 +1,13 @@
+export interface StoredSubscription {
+  subscription_id: string;
+  target_url: string;
+  object_type: string;
+  event_type: string;
+  is_active: boolean;
+  signing_secret?: string;
+  created_at: string;
+}
+
 export interface StoredEvent {
   webhook_event_id: string;       // whe_*
   selling_price_id: string;       // slp_*

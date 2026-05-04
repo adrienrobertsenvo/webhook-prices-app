@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { storeSubscription } from '@/lib/kv';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const formData = await request.formData();
@@ -40,6 +41,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const data = await res.json();
+
+  await storeSubscription({
+    subscription_id: data.id,
+    target_url: data.target_url,
+    object_type: data.object_type,
+    event_type: data.event_type,
+    is_active: data.is_active ?? false,
+    signing_secret: data.signing_secret,
+    created_at: new Date().toISOString(),
+  });
+
   return NextResponse.json({
     signing_secret: data.signing_secret,
     subscription_id: data.id,
