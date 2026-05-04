@@ -43,5 +43,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     signing_secret: data.signing_secret,
     subscription_id: data.id,
+    target_url: data.target_url,
+    object_type: data.object_type,
+    event_type: data.event_type,
+    is_active: data.is_active,
   });
 }
