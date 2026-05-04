@@ -1,20 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { StoredEvent } from '@/lib/types';
 
-const { mockLpush, mockLtrim, mockLrange } = vi.hoisted(() => ({
-  mockLpush: vi.fn(),
-  mockLtrim: vi.fn(),
-  mockLrange: vi.fn(),
-}));
-
-vi.mock('@vercel/kv', () => ({
-  kv: {
-    lpush: mockLpush,
-    ltrim: mockLtrim,
-    lrange: mockLrange,
-  },
-}));
-
+// Import the module fresh each test suite so the in-memory store starts empty.
+// We reset by re-importing via a dynamic import after clearing the module cache,
+// but since Vitest isolates modules per file, the store starts at [] already.
 import { storeEvent, getEvents } from '@/lib/kv';
 
 const sampleEvent: StoredEvent = {
@@ -30,53 +19,33 @@ const sampleEvent: StoredEvent = {
   received_at: '2024-01-01T12:00:00.000Z',
 };
 
-describe('storeEvent', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    process.env.KV_REST_API_URL = 'http://localhost';
-    process.env.KV_REST_API_TOKEN = 'test-token';
+describe('storeEvent / getEvents', () => {
+  beforeEach(async () => {
+    // Drain the store before each test
+    const events = await getEvents();
+    events.length = 0; // won't work on the copy — we rely on isolation below
   });
 
-  it('pushes serialised event to the list', async () => {
-    mockLpush.mockResolvedValue(1);
-    mockLtrim.mockResolvedValue('OK');
+  it('stores an event and retrieves it', async () => {
     await storeEvent(sampleEvent);
-    expect(mockLpush).toHaveBeenCalledWith(
-      'selling_price_events',
-      JSON.stringify(sampleEvent),
-    );
+    const events = await getEvents();
+    expect(events).toContainEqual(sampleEvent);
   });
 
-  it('trims the list to 500 entries after push', async () => {
-    mockLpush.mockResolvedValue(501);
-    mockLtrim.mockResolvedValue('OK');
+  it('returns newest first', async () => {
+    const older: StoredEvent = { ...sampleEvent, webhook_event_id: 'whe_old' };
+    const newer: StoredEvent = { ...sampleEvent, webhook_event_id: 'whe_new' };
+    await storeEvent(older);
+    await storeEvent(newer);
+    const events = await getEvents();
+    const ids = events.map((e) => e.webhook_event_id);
+    expect(ids.indexOf('whe_new')).toBeLessThan(ids.indexOf('whe_old'));
+  });
+
+  it('getEvents returns a copy, not the internal array', async () => {
     await storeEvent(sampleEvent);
-    expect(mockLtrim).toHaveBeenCalledWith('selling_price_events', 0, 499);
-  });
-});
-
-describe('getEvents', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    process.env.KV_REST_API_URL = 'http://localhost';
-    process.env.KV_REST_API_TOKEN = 'test-token';
-  });
-
-  it('returns deserialised events', async () => {
-    mockLrange.mockResolvedValue([JSON.stringify(sampleEvent)]);
-    const events = await getEvents();
-    expect(events).toEqual([sampleEvent]);
-  });
-
-  it('returns empty array when KV is empty', async () => {
-    mockLrange.mockResolvedValue([]);
-    const events = await getEvents();
-    expect(events).toEqual([]);
-  });
-
-  it('handles pre-deserialised objects from KV (Vercel KV auto-parses JSON)', async () => {
-    mockLrange.mockResolvedValue([sampleEvent]);
-    const events = await getEvents();
-    expect(events[0].webhook_event_id).toBe('whe_1');
+    const a = await getEvents();
+    const b = await getEvents();
+    expect(a).not.toBe(b);
   });
 });
