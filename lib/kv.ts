@@ -1,68 +1,85 @@
 import type { StoredEvent, StoredSubscription } from '@/lib/types';
 import { createClient } from '@vercel/edge-config';
 
-const MAX_EVENTS = 500;
+const MAX_EVENTS = 50;
 const MAX_SUBSCRIPTIONS = 100;
-const EC_KEY = 'subscriptions';
 
 // ---------------------------------------------------------------------------
-// Events — in-memory only (ephemeral demo data, high volume, not worth storing)
+// Edge Config helpers
 // ---------------------------------------------------------------------------
-
-const store: StoredEvent[] = [];
-
-export async function storeEvent(event: StoredEvent): Promise<void> {
-  store.unshift(event);
-  if (store.length > MAX_EVENTS) store.splice(MAX_EVENTS);
-}
-
-export async function getEvents(): Promise<StoredEvent[]> {
-  return [...store];
-}
-
-export async function clearEvents(): Promise<void> {
-  store.splice(0, store.length);
-}
-
-// ---------------------------------------------------------------------------
-// Subscriptions — persisted in Vercel Edge Config
-// Falls back to in-memory when Edge Config is not configured (local dev).
-// ---------------------------------------------------------------------------
-
-const memSubs: StoredSubscription[] = []; // fallback for local dev
 
 function isEdgeConfigAvailable(): boolean {
   return !!process.env.EDGE_CONFIG;
 }
 
-async function readFromEdgeConfig(): Promise<StoredSubscription[]> {
+function edgeConfigClient() {
+  return createClient(process.env.EDGE_CONFIG!);
+}
+
+async function ecRead<T>(key: string): Promise<T[]> {
   try {
-    const client = createClient(process.env.EDGE_CONFIG!);
-    const val = await client.get<StoredSubscription[]>(EC_KEY);
+    const val = await edgeConfigClient().get<T[]>(key);
     return Array.isArray(val) ? val : [];
   } catch (err) {
-    console.error('[kv] edge config read failed:', err);
+    console.error(`[kv] edge config read "${key}" failed:`, err);
     return [];
   }
 }
 
-async function writeToEdgeConfig(subs: StoredSubscription[]): Promise<void> {
+async function ecWrite(key: string, value: unknown): Promise<void> {
   const token = process.env.VERCEL_API_TOKEN;
   const configId = process.env.EDGE_CONFIG_ID;
   if (!token || !configId) {
-    console.warn('[kv] VERCEL_API_TOKEN or EDGE_CONFIG_ID not set — subscription not persisted');
+    console.warn('[kv] VERCEL_API_TOKEN or EDGE_CONFIG_ID not set — data not persisted');
     return;
   }
   const res = await fetch(`https://api.vercel.com/v1/edge-config/${configId}/items`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items: [{ operation: 'upsert', key: EC_KEY, value: subs }] }),
+    body: JSON.stringify({ items: [{ operation: 'upsert', key, value }] }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    console.error('[kv] edge config write failed:', res.status, body);
+    console.error(`[kv] edge config write "${key}" failed:`, res.status, body);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+const memEvents: StoredEvent[] = []; // fallback for local dev
+
+export async function storeEvent(event: StoredEvent): Promise<void> {
+  if (!isEdgeConfigAvailable()) {
+    memEvents.unshift(event);
+    if (memEvents.length > MAX_EVENTS) memEvents.splice(MAX_EVENTS);
+    return;
+  }
+  const existing = await ecRead<StoredEvent>('events');
+  const updated = [event, ...existing.filter((e) => e.webhook_event_id !== event.webhook_event_id)];
+  if (updated.length > MAX_EVENTS) updated.splice(MAX_EVENTS);
+  await ecWrite('events', updated);
+}
+
+export async function getEvents(): Promise<StoredEvent[]> {
+  if (!isEdgeConfigAvailable()) return [...memEvents];
+  return ecRead<StoredEvent>('events');
+}
+
+export async function clearEvents(): Promise<void> {
+  if (!isEdgeConfigAvailable()) {
+    memEvents.splice(0, memEvents.length);
+    return;
+  }
+  await ecWrite('events', []);
+}
+
+// ---------------------------------------------------------------------------
+// Subscriptions
+// ---------------------------------------------------------------------------
+
+const memSubs: StoredSubscription[] = []; // fallback for local dev
 
 export async function storeSubscription(sub: StoredSubscription): Promise<void> {
   if (!isEdgeConfigAvailable()) {
@@ -70,13 +87,13 @@ export async function storeSubscription(sub: StoredSubscription): Promise<void> 
     if (memSubs.length > MAX_SUBSCRIPTIONS) memSubs.splice(MAX_SUBSCRIPTIONS);
     return;
   }
-  const existing = await readFromEdgeConfig();
+  const existing = await ecRead<StoredSubscription>('subscriptions');
   const updated = [sub, ...existing.filter((s) => s.subscription_id !== sub.subscription_id)];
   if (updated.length > MAX_SUBSCRIPTIONS) updated.splice(MAX_SUBSCRIPTIONS);
-  await writeToEdgeConfig(updated);
+  await ecWrite('subscriptions', updated);
 }
 
 export async function getSubscriptions(): Promise<StoredSubscription[]> {
   if (!isEdgeConfigAvailable()) return [...memSubs];
-  return readFromEdgeConfig();
+  return ecRead<StoredSubscription>('subscriptions');
 }
