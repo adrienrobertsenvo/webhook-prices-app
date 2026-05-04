@@ -10,7 +10,15 @@ interface CreateResult {
   object_type?: string;
   event_type?: string;
   is_active?: boolean;
-  error?: string;
+  // error may be a string or an array/object from Senvo validation errors
+  error?: unknown;
+}
+
+function errorMessage(err: unknown): string {
+  if (typeof err === 'string') return err;
+  if (Array.isArray(err)) return err.map((e) => (typeof e === 'object' && e ? (e as Record<string, unknown>).msg ?? JSON.stringify(e) : String(e))).join('; ');
+  if (typeof err === 'object' && err !== null) return JSON.stringify(err);
+  return String(err);
 }
 
 export default function SetupForm({
@@ -128,7 +136,7 @@ export default function SetupForm({
       {result?.error && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
           <p className="text-sm font-semibold text-red-800">Error</p>
-          <p className="mt-1 text-sm text-red-600">{result.error}</p>
+          <p className="mt-1 text-sm text-red-600">{errorMessage(result.error)}</p>
         </div>
       )}
 
