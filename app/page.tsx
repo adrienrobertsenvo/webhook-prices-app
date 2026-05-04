@@ -1,6 +1,7 @@
 import { getEvents } from '@/lib/kv';
 import type { StoredEvent } from '@/lib/types';
 import ResetButton from './ResetButton';
+import HitsPanel from './HitsPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +85,8 @@ export default async function DashboardPage() {
           </table>
         </div>
       )}
+
+      <HitsPanel />
     </main>
   );
 }

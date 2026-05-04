@@ -1,3 +1,12 @@
+export interface WebhookHit {
+  received_at: string;
+  method: string;
+  signature: string;
+  body: string;          // raw body, truncated to 2000 chars
+  result: 'stored' | 'ignored' | 'invalid_signature' | 'no_secret' | 'invalid_json' | 'error';
+  status: number;
+}
+
 export interface StoredSubscription {
   subscription_id: string;
   target_url: string;

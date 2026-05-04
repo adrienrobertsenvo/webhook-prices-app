@@ -1,8 +1,9 @@
-import type { StoredEvent, StoredSubscription } from '@/lib/types';
+import type { StoredEvent, StoredSubscription, WebhookHit } from '@/lib/types';
 import { createClient } from '@vercel/edge-config';
 
 const MAX_EVENTS = 50;
 const MAX_SUBSCRIPTIONS = 100;
+const MAX_HITS = 100;
 
 // ---------------------------------------------------------------------------
 // Edge Config helpers
@@ -96,4 +97,19 @@ export async function storeSubscription(sub: StoredSubscription): Promise<void> 
 export async function getSubscriptions(): Promise<StoredSubscription[]> {
   if (!isEdgeConfigAvailable()) return [...memSubs];
   return ecRead<StoredSubscription>('subscriptions');
+}
+
+// ---------------------------------------------------------------------------
+// Webhook hits — in-memory only (debug/testing, high frequency, small structs)
+// ---------------------------------------------------------------------------
+
+const memHits: WebhookHit[] = [];
+
+export function recordHit(hit: WebhookHit): void {
+  memHits.unshift(hit);
+  if (memHits.length > MAX_HITS) memHits.splice(MAX_HITS);
+}
+
+export function getHits(): WebhookHit[] {
+  return [...memHits];
 }
